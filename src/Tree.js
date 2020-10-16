@@ -1,46 +1,10 @@
-import React from "react";
+import React, { useRef } from "react";
 import Tree from "react-d3-tree";
 import clone from "clone";
 
-const debugData = {
+const treeData = {
     name: "Root",
-    children: [
-        {
-            name: "1",
-            children: [
-                {
-                    name: "12",
-                    children: [
-                        {
-                            name: "123",
-                            children: []
-                        }
-                    ]
-                }
-            ]
-        },
-        {
-            name: "2",
-            children: [{
-                name: "21",
-                children: []
-            },
-            {
-                name: "22",
-                children: [
-                    {
-                        name: "221",
-                        children: []
-                    },
-                    {
-                        name: "222",
-                        children: []
-                    }
-                ]
-            }]
-        }
-
-    ]
+    children: []
 };
 
 const containerStyles = {
@@ -50,11 +14,18 @@ const containerStyles = {
 
 export default class CenteredTree extends React.PureComponent {
     state = {
-        data: debugData
+        data: treeData
     };
 
     rootChildCount = 0;
 
+    // array to hold calculated page ranks for each node
+    pageRanks = []
+
+    // Creating ref to pass it to input field in dom to fetch value 
+    inputRef = React.createRef();
+
+    // Recursive function to find a specific node 
     findNode = (data, nodeName, nestingKey) => (
         data.reduce((a, item) => {
             if (a) return a;
@@ -63,13 +34,13 @@ export default class CenteredTree extends React.PureComponent {
         }, null)
     );
 
+    // Function to add a child node to the root node
     addChildNodeToRoot = () => {
         const newData = clone(this.state.data);
         const target = newData.children;
         this.rootChildCount++;
         target.push({
-            name: `Child ${this.rootChildCount}`,
-            id: `child-${this.rootChildCount}`,
+            name: `${this.rootChildCount}`,
             children: [],
             attributes: {
                 parent: 'Root'
@@ -80,50 +51,94 @@ export default class CenteredTree extends React.PureComponent {
         });
     };
 
+    // Add a child node to an existing node
+    addChildNode = (nodeData, evt) => {
+        if (nodeData.name === 'Root') {
+            this.addChildNodeToRoot();
+        }
+        else {
+            const nodeName = nodeData.name;
+            const newData = clone(this.state.data);
+            const targetNode = this.findNode(newData.children, nodeName, 'children');
+            const noChildrenOfTarget = targetNode.children.length;
+
+            targetNode.children.push({
+                name: `${nodeName}${noChildrenOfTarget + 1}`,
+                children: [],
+                attributes: {
+                    parent: nodeName
+                }
+            });
+
+            this.setState({
+                data: newData
+            });
+        }
+    }
+
+    // Remove last direct child of Root
     removeChildNodeFromRoot = () => {
         const newData = clone(this.state.data);
-        const target = newData.children;
-        target.pop();
+        const targetNode = newData.children;
+        targetNode.pop();
         this.rootChildCount--;
         this.setState({
             data: newData
         });
     };
 
-    addChildNode = (nodeData, evt) => {
-        //console.log(nodeData);
-        const nodeName = nodeData.name;
+    // function to show neighboring nodes of the user input node
+    getNeighborNodes = () => {
+        //get node name from input field
+        const nodeName = this.inputRef.current.value;
+        const targetNode = this.findNode(this.state.data.children, nodeName, 'children');
+        let neighborNodes = [];
 
-        const newData = clone(this.state.data);
-        const target = newData.children.find((node) => { return node.name === nodeName });
-        console.log(newData.children)
-        console.log(nodeName)
-        const targetChildren = target.children;
-        const noOfTargetChildren = target.children.length;
+        if (targetNode !== null) {
+            const targetParentName = targetNode.attributes.parent;
 
-        targetChildren.push({
-            name: `${nodeName}-${noOfTargetChildren}`,
-            id: `child-${nodeName}-${noOfTargetChildren}`,
-            children: [],
-            attributes: {
-                parent: nodeName
+            if (targetParentName === 'Root') {
+                this.state.data.children.forEach(node => {
+                    if (node.name !== nodeName) {
+                        neighborNodes.push(node.name)
+                    }
+                });
             }
-        });
+            else {
+                const targetParentNode = this.findNode(this.state.data.children, targetParentName, 'children');
+                const targetNeighbors = targetParentNode.children;
 
+                targetNeighbors.forEach(node => {
+                    if (node.name !== nodeName) {
+                        neighborNodes.push(node.name)
+                    }
+                });
+            }
+            neighborNodes.length === 0 ? alert(`No Neighbours for ${nodeName}`) : alert(`Neighbor nodes for ${nodeName}: ${neighborNodes}`);
 
-
-        //console.log("newData", newData)
-
-        this.setState({
-            data: newData
-        });
-
-        //console.log("state childern: ", this.state.data.children);
+        } else {
+            alert('Invalid node');
+        }
     }
 
-    showEdgeDetails = (linkSource, linkTarget, evt) => {
-        console.log('node parent: ', linkSource)
-        console.log('node: ', linkTarget)
+    // function to calculate page ranks for each node and store them in pageRanks global array
+    calculatePageRanks = (treeData) => {
+        treeData.children.forEach((node) => {
+            if (node.children.length > 0) {
+                this.pageRanks.push({ name: node.name, pageRank: node.children.length + 1 });
+                this.generatePageRanks(node)
+            }
+            else {
+                this.pageRanks.push({ name: node.name, pageRank: 1 });
+            }
+        });
+    }
+
+    //function to load calculated page ranks
+    generatePageRanks = () => {
+        const treeData = clone(this.state.data);
+        this.generatePageRanks(treeData);
+        console.log(this.pageRanks)
     }
 
     componentDidMount() {
@@ -135,8 +150,6 @@ export default class CenteredTree extends React.PureComponent {
                 y: dimensions.height / 2
             }
         });
-
-        //console.log(this.findNode(this.state.data.children, '223', 'children'));
     }
 
     render() {
@@ -144,8 +157,9 @@ export default class CenteredTree extends React.PureComponent {
             <div style={containerStyles} ref={tc => (this.treeContainer = tc)}>
                 <button onClick={this.addChildNodeToRoot}>Add Node To Root</button>
                 <button onClick={this.removeChildNodeFromRoot}>Remove Node From Root</button>
-
-                {/* <button onClick={console.log(this.bob)}>Show state</button> */}
+                <input type='text' ref={this.inputRef} placeholder="enter node number"></input>
+                <button onClick={this.getNeighborNodes}>Get neighbouring nodes</button>
+                <button onClick={this.bob}>Calculate Page rank</button>
 
                 <Tree
                     data={this.state.data}
@@ -154,11 +168,8 @@ export default class CenteredTree extends React.PureComponent {
                     pathFunc={'straight'}
                     separation={{ siblings: 2 }}
                     onClick={(nodeData, evt) => this.addChildNode(nodeData, evt)}
-                    onLinkClick={(linkSource, linkTarget, evt) => this.showEdgeDetails(linkSource, linkTarget, evt)}
                 />
             </div>
         );
     }
 }
-
-//export default Tree;
