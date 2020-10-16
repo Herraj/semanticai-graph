@@ -19,6 +19,9 @@ export default class CenteredTree extends React.PureComponent {
 
     rootChildCount = 0;
 
+    // array to hold calculated page ranks for each node
+    pageRanks = []
+
     // Creating ref to pass it to input field in dom to fetch value 
     inputRef = React.createRef();
 
@@ -85,7 +88,8 @@ export default class CenteredTree extends React.PureComponent {
     };
 
     // function to show neighboring nodes of the user input node
-    showNeighborNodes = () => {
+    getNeighborNodes = () => {
+        //get node name from input field
         const nodeName = this.inputRef.current.value;
         const targetNode = this.findNode(this.state.data.children, nodeName, 'children');
         let neighborNodes = [];
@@ -117,6 +121,26 @@ export default class CenteredTree extends React.PureComponent {
         }
     }
 
+    // function to calculate page ranks for each node and store them in pageRanks global array
+    calculatePageRanks = (treeData) => {
+        treeData.children.forEach((node) => {
+            if (node.children.length > 0) {
+                this.pageRanks.push({ name: node.name, pageRank: node.children.length + 1 });
+                this.generatePageRanks(node)
+            }
+            else {
+                this.pageRanks.push({ name: node.name, pageRank: 1 });
+            }
+        });
+    }
+
+    //function to load calculated page ranks
+    generatePageRanks = () => {
+        const treeData = clone(this.state.data);
+        this.generatePageRanks(treeData);
+        console.log(this.pageRanks)
+    }
+
     componentDidMount() {
         // Get treeContainer's dimensions so we can center the tree
         const dimensions = this.treeContainer.getBoundingClientRect();
@@ -133,9 +157,9 @@ export default class CenteredTree extends React.PureComponent {
             <div style={containerStyles} ref={tc => (this.treeContainer = tc)}>
                 <button onClick={this.addChildNodeToRoot}>Add Node To Root</button>
                 <button onClick={this.removeChildNodeFromRoot}>Remove Node From Root</button>
-
                 <input type='text' ref={this.inputRef} placeholder="enter node number"></input>
-                <button onClick={this.showNeighborNodes}>Get neighbouring nodes</button>
+                <button onClick={this.getNeighborNodes}>Get neighbouring nodes</button>
+                <button onClick={this.bob}>Calculate Page rank</button>
 
                 <Tree
                     data={this.state.data}
