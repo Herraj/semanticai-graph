@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import Tree from "react-d3-tree";
 import clone from "clone";
 
@@ -18,6 +18,9 @@ export default class CenteredTree extends React.PureComponent {
     };
 
     rootChildCount = 0;
+
+    // Creating ref to pass it to input field in dom to fetch value 
+    inputRef = React.createRef();
 
     // Recursive function to find a specific node 
     findNode = (data, nodeName, nestingKey) => (
@@ -81,9 +84,37 @@ export default class CenteredTree extends React.PureComponent {
         });
     };
 
-    showEdgeDetails = (linkSource, linkTarget, evt) => {
-        console.log('node parent: ', linkSource)
-        console.log('node: ', linkTarget)
+    // function to show neighboring nodes of the user input node
+    showNeighborNodes = () => {
+        const nodeName = this.inputRef.current.value;
+        const targetNode = this.findNode(this.state.data.children, nodeName, 'children');
+        let neighborNodes = [];
+
+        if (targetNode !== null) {
+            const targetParentName = targetNode.attributes.parent;
+
+            if (targetParentName === 'Root') {
+                this.state.data.children.forEach(node => {
+                    if (node.name !== nodeName) {
+                        neighborNodes.push(node.name)
+                    }
+                });
+            }
+            else {
+                const targetParentNode = this.findNode(this.state.data.children, targetParentName, 'children');
+                const targetNeighbors = targetParentNode.children;
+
+                targetNeighbors.forEach(node => {
+                    if (node.name !== nodeName) {
+                        neighborNodes.push(node.name)
+                    }
+                });
+            }
+            neighborNodes.length === 0 ? alert(`No Neighbours for ${nodeName}`) : alert(`Neighbor nodes for ${nodeName}: ${neighborNodes}`);
+
+        } else {
+            alert('Invalid node');
+        }
     }
 
     componentDidMount() {
@@ -95,8 +126,6 @@ export default class CenteredTree extends React.PureComponent {
                 y: dimensions.height / 2
             }
         });
-
-        //console.log(this.findNode(this.state.data.children, '223', 'children'));
     }
 
     render() {
@@ -105,7 +134,8 @@ export default class CenteredTree extends React.PureComponent {
                 <button onClick={this.addChildNodeToRoot}>Add Node To Root</button>
                 <button onClick={this.removeChildNodeFromRoot}>Remove Node From Root</button>
 
-                {/* <button onClick={console.log(this.bob)}>Show state</button> */}
+                <input type='text' ref={this.inputRef} placeholder="enter node number"></input>
+                <button onClick={this.showNeighborNodes}>Get neighbouring nodes</button>
 
                 <Tree
                     data={this.state.data}
@@ -114,11 +144,8 @@ export default class CenteredTree extends React.PureComponent {
                     pathFunc={'straight'}
                     separation={{ siblings: 2 }}
                     onClick={(nodeData, evt) => this.addChildNode(nodeData, evt)}
-                    onLinkClick={(linkSource, linkTarget, evt) => this.showEdgeDetails(linkSource, linkTarget, evt)}
                 />
             </div>
         );
     }
 }
-
-//export default Tree;
